@@ -705,4 +705,286 @@ body.dark-theme .navbar-toggler-icon {
   background-color: var(--border-color) !important;
 }
 
+/* Custom Leaflet Map & Pin Styles */
+.leaflet-map-wrapper {
+  height: 460px;
+  width: 100%;
+  z-index: 1;
+  border-radius: 0;
+  overflow: hidden;
+  background: var(--light-bg-block, #f8fafc);
+}
+
+@media (max-width: 768px) {
+  .leaflet-map-wrapper {
+    height: 350px;
+  }
+}
+
+@media (max-width: 480px) {
+  .leaflet-map-wrapper {
+    height: 310px;
+  }
+}
+
+.custom-map-pin-wrap, .user-map-pin-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-pin-badge {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.map-pin-badge:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.6);
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+}
+
+.user-pin-badge {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.5);
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.map-pin-pulse {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(2, 132, 199, 0.35);
+  animation: mapPinPulse 2s infinite ease-out;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.user-pin-pulse {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.4);
+  animation: mapPinPulse 1.5s infinite ease-out;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes mapPinPulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.custom-leaflet-popup .leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  background: var(--card-bg, #ffffff);
+  color: var(--text-color, #1e293b);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.custom-leaflet-popup .leaflet-popup-tip {
+  background: var(--card-bg, #ffffff);
+}
+
+.map-popup-card .popup-title {
+  color: var(--primary-blue, #0266ff);
+}
+
+.map-popup-card .popup-desc {
+  color: var(--text-muted-color, #64748b);
+}
+
+.map-popup-card .popup-arrival {
+  color: var(--text-color, #1e293b);
+}
+
+/* Explicit Dark Mode Overrides for Leaflet Map & Popups */
+body.dark-theme .custom-leaflet-popup .leaflet-popup-content-wrapper {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+body.dark-theme .custom-leaflet-popup .leaflet-popup-tip {
+  background: #1e293b !important;
+}
+
+body.dark-theme .map-popup-card .popup-title {
+  color: #38bdf8 !important;
+}
+
+body.dark-theme .map-popup-card .popup-desc {
+  color: #94a3b8 !important;
+}
+
+body.dark-theme .map-popup-card .popup-arrival {
+  color: #e2e8f0 !important;
+}
+
+body.dark-theme .service-map-container .map-control-btn {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+body.dark-theme .service-map-container .map-status-overlay {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+body.dark-theme .service-map-container .map-pill-btn {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+body.dark-theme .leaflet-tile-pane {
+  filter: brightness(0.85) contrast(1.1) invert(0.9) hue-rotate(200deg);
+}
+
+.map-pills-scroll-wrapper {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  scrollbar-width: none; /* Firefox */
+}
+
+.map-pills-scroll-wrapper::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.pulse-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border-radius: 50%;
+  border: 2px solid #22c55e;
+  animation: dotPulse 1.8s infinite;
+}
+
+@keyframes dotPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.scale-105 {
+  transform: scale(1.05);
+}
+
+.bg-primary-gradient {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0369a1 100%) !important;
+}
+
+.z-index-top {
+  z-index: 1000;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* FAQ Section Theme Styling (Light & Dark Mode) */
+.faq-item-card {
+  background-color: var(--card-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+}
+
+.faq-item-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(2, 102, 255, 0.3) !important;
+  box-shadow: 0 8px 25px rgba(2, 102, 255, 0.08) !important;
+}
+
+.faq-question {
+  color: var(--title-color) !important;
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+.faq-answer {
+  color: var(--text-muted-color) !important;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* Specific Dark Theme Overrides for FAQ Cards & Container */
+body.dark-theme .faq-item-card {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.dark-theme .faq-item-card:hover {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 8px 25px rgba(56, 189, 248, 0.15) !important;
+}
+
+body.dark-theme .faq-question {
+  color: #f8fafc !important;
+}
+
+body.dark-theme .faq-answer {
+  color: #94a3b8 !important;
+}
+
+body.dark-theme #faq.bg-white-section {
+  background-color: #0f172a !important;
+}
 

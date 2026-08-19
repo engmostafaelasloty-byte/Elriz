@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Container, Row, Col, Navbar, Nav, Button, Card, Form, Alert, Badge, Table, Modal, InputGroup, Carousel } from 'react-bootstrap';
+import ServiceMap from './components/ServiceMap';
 
 const DEFAULT_SETTINGS = {
   logoType: 'text-icon', // 'text-icon' | 'image'
@@ -7,14 +8,16 @@ const DEFAULT_SETTINGS = {
   logoImage: '', // Base64 encoded logo image
   logoColor: '#0266ff',
   logoSize: 40, // Height in pixels
+  logoShape: 'circle', // 'circle' | 'rounded' | 'square'
+  logoBorderWidth: 2, // 0 to 10px
+  logoBorderColor: '#0266ff', // hex color
   phoneCall: '0507295464',
   phoneHotline: '0507295464',
   phoneWhatsapp: '0507295464',
   email: 'info@alrizq-hvac.com',
-  coverageAreas: 'الرياض، جدة، وكافة الأحياء المجاورة',
+  coverageAreas: 'الرياض - العليا - السلمانية - حي الصحافة - الياسمين - النرجس',
   heroImages: [
     '/images/hero_technician.png',
-    '/images/refrigeration_service.png',
     '/images/condenser_service.png'
   ]
 };
@@ -34,6 +37,61 @@ function App() {
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [navExpanded, setNavExpanded] = useState(false);
+  const [showLogoModal, setShowLogoModal] = useState(false);
+  const longPressTimer = useRef(null);
+
+  const handleLogoTouchStart = () => {
+    longPressTimer.current = setTimeout(() => {
+      setShowLogoModal(true);
+    }, 400);
+  };
+
+  const handleLogoTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleDeleteLogoImage = async () => {
+    const updatedSettings = {
+      ...tempSettings,
+      logoImage: '',
+      logoType: 'text-icon'
+    };
+    setTempSettings(updatedSettings);
+    setSettings(updatedSettings);
+    localStorage.setItem('hvac_site_settings', JSON.stringify(updatedSettings));
+
+    try {
+      await fetch('/api/save-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSettings)
+      });
+    } catch (err) {
+      console.error('Failed to sync deleted logo globally:', err);
+    }
+
+    setSettingsSuccess(true);
+    setTimeout(() => setSettingsSuccess(false), 3000);
+  };
+
+  const handleNavClick = (sectionId) => {
+    setNavExpanded(false);
+    if (viewMode !== 'site') {
+      setViewMode('site');
+    }
+    setTimeout(() => {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.location.hash = `#${sectionId}`;
+      }
+    }, 150);
+  };
 
   // --- Theme State (Dark / Light Mode) ---
   const [theme, setTheme] = useState('light');
@@ -52,50 +110,49 @@ function App() {
     setTheme(initialTheme);
     document.body.classList.toggle('dark-theme', initialTheme === 'dark');
 
-    // 2. Load Site Settings
-    const savedSettings = localStorage.getItem('hvac_site_settings');
-    if (savedSettings) {
-      let parsed = JSON.parse(savedSettings);
-      
-      // Auto-migrate old default phone/whatsapp/hotline to user's new number
-      if (parsed.phoneCall === '+966500000000' || parsed.phoneCall === '0500000000') {
-        parsed.phoneCall = '0507295464';
+    // 2. Load Site Settings globally from /settings.json
+    const loadGlobalSettings = async () => {
+      try {
+        const res = await fetch(`/settings.json?t=${Date.now()}`);
+        if (res.ok) {
+          const globalData = await res.json();
+          if (globalData.heroImages) {
+            globalData.heroImages = globalData.heroImages.filter(
+              img => !img.includes('refrigeration_service.png')
+            );
+          }
+          setSettings(globalData);
+          setTempSettings(globalData);
+          localStorage.setItem('hvac_site_settings', JSON.stringify(globalData));
+          return;
+        }
+      } catch (err) {
+        console.warn('Could not fetch global settings.json, using local storage fallback', err);
       }
-      if (parsed.phoneWhatsapp === '966500000000' || parsed.phoneWhatsapp === '500000000') {
-        parsed.phoneWhatsapp = '0507295464';
+
+      const savedSettings = localStorage.getItem('hvac_site_settings');
+      if (savedSettings) {
+        let parsed = JSON.parse(savedSettings);
+        if (parsed.heroImages) {
+          parsed.heroImages = parsed.heroImages.filter(
+            img => !img.includes('refrigeration_service.png')
+          );
+        }
+        setSettings(parsed);
+        setTempSettings(parsed);
+      } else {
+        setSettings(DEFAULT_SETTINGS);
+        setTempSettings(DEFAULT_SETTINGS);
       }
-      if (parsed.phoneHotline === '19000') {
-        parsed.phoneHotline = '0507295464';
-      }
-      // Migrate site name from old template to "الرزق للتكييف والتبريد | فني معتمد"
-      if (!parsed.logoText || parsed.logoText === 'البارد & الساخن' || parsed.logoText === 'البارد والساخن' || parsed.logoText === 'الرزق للتكييف والتبريد') {
-        parsed.logoText = 'الرزق للتكييف والتبريد | فني معتمد';
-      }
-      if (parsed.email === 'info@coolheat-hvac.com') {
-        parsed.email = 'info@alrizq-hvac.com';
-      }
-      if (!parsed.coverageAreas) {
-        parsed.coverageAreas = 'الرياض، جدة، وكافة الأحياء المجاورة';
-      }
-      delete parsed.socialFacebook;
-      delete parsed.socialTelegram;
-      delete parsed.socialInstagram;
-      delete parsed.socialTwitter;
-      
-      setSettings(parsed);
-      setTempSettings(parsed);
-      localStorage.setItem('hvac_site_settings', JSON.stringify(parsed));
-    } else {
-      setSettings(DEFAULT_SETTINGS);
-      setTempSettings(DEFAULT_SETTINGS);
-      localStorage.setItem('hvac_site_settings', JSON.stringify(DEFAULT_SETTINGS));
-    }
+    };
+
+    loadGlobalSettings();
 
     // 3. Load Admin Status
     const savedAdminStatus = sessionStorage.getItem('hvac_isAdmin');
     if (savedAdminStatus === 'true') {
       setIsAdmin(true);
-      setViewMode('admin'); // Default to admin view if logged in
+      setViewMode('admin');
     }
   }, []);
 
@@ -115,9 +172,22 @@ function App() {
     setShowLoginModal(true);
   };
 
-  const handleLoginSubmit = (e) => {
+  // SHA-256 Hash helper for secure admin authentication
+  const hashPassword = async (plainText) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(plainText);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  // Encrypted SHA-256 hash for password 'rizk10002000'
+  const ADMIN_PASSWORD_HASH = 'b54e412106aaa78f87d1388487a5426928e06ff4033f59f36cc781989b515100';
+
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (passwordInput === 'riz10002000') {
+    const inputHash = await hashPassword(passwordInput);
+    if (inputHash === ADMIN_PASSWORD_HASH) {
       setIsAdmin(true);
       setViewMode('admin');
       sessionStorage.setItem('hvac_isAdmin', 'true');
@@ -205,9 +275,11 @@ function App() {
     }
   };
 
-  const handleSaveSettings = (e) => {
+  const handleSaveSettings = async (e) => {
     e.preventDefault();
-    const cleanedImages = tempSettings.heroImages.filter(img => img && img.trim() !== '');
+    const cleanedImages = tempSettings.heroImages.filter(
+      img => img && img.trim() !== '' && !img.includes('refrigeration_service.png')
+    );
     if (cleanedImages.length === 0) {
       alert('يجب توفير صورة واحدة على الأقل لمعرض البطل (Hero Images).');
       return;
@@ -215,29 +287,66 @@ function App() {
 
     const updatedSettings = {
       ...tempSettings,
-      heroImages: cleanedImages
+      heroImages: cleanedImages,
+      logoImage: tempSettings.logoType === 'text-icon' ? '' : tempSettings.logoImage,
+      logoType: tempSettings.logoType === 'text-icon' || !tempSettings.logoImage ? 'text-icon' : 'image'
     };
 
     setSettings(updatedSettings);
     setTempSettings(updatedSettings);
     localStorage.setItem('hvac_site_settings', JSON.stringify(updatedSettings));
+
+    // Persist globally across system for ALL users and devices
+    try {
+      await fetch('/api/save-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSettings)
+      });
+    } catch (err) {
+      console.error('Failed to sync settings globally:', err);
+    }
+
     setSettingsSuccess(true);
     setTimeout(() => setSettingsSuccess(false), 4000);
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
 
   // --- Render custom logo ---
   const renderLogo = (isFooter = false) => {
     const height = isFooter ? Math.min(settings.logoSize, 50) : settings.logoSize;
-    if (settings.logoType === 'image' && settings.logoImage) {
+    if (settings.logoType === 'image' && settings.logoImage && settings.logoImage.trim() !== '') {
+      let borderRadius = '0px';
+      if ((settings.logoShape || 'circle') === 'circle') borderRadius = '50%';
+      if (settings.logoShape === 'rounded') borderRadius = '12px';
+
+      const borderWidth = settings.logoBorderWidth || 0;
+      const borderColor = settings.logoBorderColor || '#0266ff';
+
       return (
-        <img 
-          src={settings.logoImage} 
-          alt="شعار مخصص" 
-          className="object-fit-contain" 
-          style={{ height: `${height}px`, transition: 'height 0.3s ease' }}
-        />
+        <div 
+          className="position-relative d-inline-block cursor-pointer logo-image-wrapper"
+          onMouseDown={handleLogoTouchStart}
+          onMouseUp={handleLogoTouchEnd}
+          onTouchStart={handleLogoTouchStart}
+          onTouchEnd={handleLogoTouchEnd}
+          onDoubleClick={() => setShowLogoModal(true)}
+          title="اضغط ضغطة مطولة أو مرتين لفتح الصورة بالكامل"
+        >
+          <img 
+            src={settings.logoImage} 
+            alt="شعار مخصص" 
+            style={{ 
+              height: `${height}px`,
+              width: (settings.logoShape || 'circle') === 'circle' ? `${height}px` : 'auto',
+              borderRadius: borderRadius,
+              border: borderWidth > 0 ? `${borderWidth}px solid ${borderColor}` : 'none',
+              objectFit: 'cover',
+              transition: 'all 0.3s ease'
+            }}
+          />
+        </div>
       );
     }
 
@@ -303,9 +412,9 @@ function App() {
 
       {/* Main Navbar */}
       {viewMode !== 'admin' && (
-        <Navbar expand="lg" sticky="top" className="glass-navbar py-3">
+        <Navbar expand="lg" sticky="top" className="glass-navbar py-3" expanded={navExpanded} onToggle={setNavExpanded}>
           <Container>
-            <Navbar.Brand href="#home" onClick={() => setViewMode('site')} className="d-flex align-items-center gap-2 cursor-pointer">
+            <Navbar.Brand href="#home" onClick={(e) => { e.preventDefault(); handleNavClick('home'); }} className="d-flex align-items-center gap-2 cursor-pointer">
               {renderLogo()}
             </Navbar.Brand>
             
@@ -314,25 +423,32 @@ function App() {
             <Navbar.Collapse id="basic-navbar-nav" className="justify-content-between">
               <Nav className="mx-auto">
                 <Nav.Link 
-                  onClick={() => { setViewMode('site'); setTimeout(() => window.location.hash = "#home", 100); }} 
+                  onClick={() => handleNavClick('home')} 
                   className={`nav-link-custom cursor-pointer ${viewMode === 'site' ? 'active' : ''}`}
                 >
                   الرئيسية
                 </Nav.Link>
                 <Nav.Link 
-                  onClick={() => { setViewMode('site'); setTimeout(() => window.location.hash = "#services", 100); }} 
+                  onClick={() => handleNavClick('services')} 
                   className="nav-link-custom cursor-pointer"
                 >
                   خدماتنا
                 </Nav.Link>
                 <Nav.Link 
-                  onClick={() => { setViewMode('site'); setTimeout(() => window.location.hash = "#why-us", 100); }} 
+                  onClick={() => handleNavClick('service-map-section')} 
+                  className="nav-link-custom cursor-pointer"
+                >
+                  <i className="bi bi-geo-alt-fill me-1 text-warning"></i>
+                  مناطق الخدمة
+                </Nav.Link>
+                <Nav.Link 
+                  onClick={() => handleNavClick('why-us')} 
                   className="nav-link-custom cursor-pointer"
                 >
                   لماذا نحن؟
                 </Nav.Link>
                 <Nav.Link 
-                  onClick={() => { setViewMode('site'); setTimeout(() => window.location.hash = "#contact", 100); }} 
+                  onClick={() => handleNavClick('contact')} 
                   className="nav-link-custom cursor-pointer"
                 >
                   تواصل معنا
@@ -428,7 +544,7 @@ function App() {
                             <div className="d-flex align-items-center gap-2">
                               <Form.Control
                                   type="color"
-                                  value={tempSettings.logoColor}
+                                  value={tempSettings.logoColor || '#0266ff'}
                                   onChange={(e) => handleSettingsFieldChange('logoColor', e.target.value)}
                                   className="form-control-color border-0 rounded"
                                   style={{ width: '50px', height: '40px', padding: '0', cursor: 'pointer' }}
@@ -436,36 +552,165 @@ function App() {
                               <span className="text-muted small">اختر لوناً متناسباً مع هويتك (مثل درجات الأزرق أو الأخضر).</span>
                             </div>
                           </Form.Group>
-                        </>
-                      ) : (
-                        <Form.Group className="mb-3">
-                          <Form.Label className="form-label-custom">رفع ملف صورة الشعار</Form.Label>
-                          <Form.Control
-                            type="file"
-                            accept="image/*"
-                            onChange={handleLogoUpload}
-                            className="form-control-custom text-start"
-                          />
+
                           {tempSettings.logoImage && (
-                            <div className="mt-3 p-3 bg-light-block rounded-3 text-center">
-                              <span className="small text-muted d-block mb-2">معاينة الشعار المرفوع حالياً:</span>
-                              <img src={tempSettings.logoImage} alt="شعار مخصص" style={{ maxHeight: '80px' }} className="object-fit-contain" />
+                            <div className="mb-3 p-3 bg-light-block rounded-3 border d-flex align-items-center justify-content-between">
+                              <span className="small text-muted">توجد صورة شعار سابقة مرفوعة</span>
+                              <Button 
+                                variant="outline-danger" 
+                                size="sm" 
+                                onClick={handleDeleteLogoImage}
+                                className="py-1 px-3 fs-7 rounded-pill fw-bold"
+                              >
+                                <i className="bi bi-trash3-fill me-1"></i> حذف الصورة وحفظ الشعار النصي
+                              </Button>
                             </div>
                           )}
-                        </Form.Group>
+                        </>
+                      ) : (
+                        <>
+                          <Form.Group className="mb-3">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                              <Form.Label className="form-label-custom mb-0">رفع صورة الشعار المخصص</Form.Label>
+                              {tempSettings.logoImage && (
+                                <Button 
+                                  variant="outline-danger" 
+                                  size="sm" 
+                                  onClick={handleDeleteLogoImage}
+                                  className="py-1 px-3 fs-7 rounded-pill fw-bold"
+                                  title="حذف صورة الشعار والرجوع للشعار النصي"
+                                >
+                                  <i className="bi bi-trash3-fill me-1"></i> حذف الشعار المرفوع
+                                </Button>
+                              )}
+                            </div>
+                            <Form.Control
+                              type="file"
+                              accept="image/*"
+                              onChange={handleLogoUpload}
+                              className="form-control-custom text-start"
+                            />
+                          </Form.Group>
+
+                          {/* Logo Shape (Circle / Rounded / Square) */}
+                          <Form.Group className="mb-3">
+                            <Form.Label className="form-label-custom">شكل الشعار المرفوع</Form.Label>
+                            <div className="d-flex gap-2">
+                              <Button
+                                type="button"
+                                variant={(tempSettings.logoShape || 'circle') === 'circle' ? 'primary' : 'outline-secondary'}
+                                size="sm"
+                                onClick={() => handleSettingsFieldChange('logoShape', 'circle')}
+                                className="flex-fill rounded-pill py-2 d-flex align-items-center justify-content-center gap-1 fw-bold fs-7"
+                              >
+                                <i className="bi bi-circle-fill"></i>
+                                <span>دائري (Circle)</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={tempSettings.logoShape === 'rounded' ? 'primary' : 'outline-secondary'}
+                                size="sm"
+                                onClick={() => handleSettingsFieldChange('logoShape', 'rounded')}
+                                className="flex-fill rounded-pill py-2 d-flex align-items-center justify-content-center gap-1 fw-bold fs-7"
+                              >
+                                <i className="bi bi-square-fill" style={{ borderRadius: '4px' }}></i>
+                                <span>حواف دائرية</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={tempSettings.logoShape === 'square' ? 'primary' : 'outline-secondary'}
+                                size="sm"
+                                onClick={() => handleSettingsFieldChange('logoShape', 'square')}
+                                className="flex-fill rounded-pill py-2 d-flex align-items-center justify-content-center gap-1 fw-bold fs-7"
+                              >
+                                <i className="bi bi-square"></i>
+                                <span>مربع / أصلي</span>
+                              </Button>
+                            </div>
+                          </Form.Group>
+
+                          {/* Border Width & Border Color */}
+                          <Row className="g-2 mb-3">
+                            <Col xs={6}>
+                              <Form.Group>
+                                <Form.Label className="form-label-custom">سمك الإطار (Border)</Form.Label>
+                                <Form.Select
+                                  value={tempSettings.logoBorderWidth || 0}
+                                  onChange={(e) => handleSettingsFieldChange('logoBorderWidth', parseInt(e.target.value))}
+                                  className="form-control-custom"
+                                >
+                                  <option value={0}>بدون إطار (0px)</option>
+                                  <option value={1}>إطار خفيف (1px)</option>
+                                  <option value={2}>إطار متوسط (2px)</option>
+                                  <option value={4}>إطار بارز (4px)</option>
+                                  <option value={6}>إطار سميك (6px)</option>
+                                </Form.Select>
+                              </Form.Group>
+                            </Col>
+                            <Col xs={6}>
+                              <Form.Group>
+                                <Form.Label className="form-label-custom">لون الإطار</Form.Label>
+                                <div className="d-flex align-items-center gap-2">
+                                  <Form.Control
+                                    type="color"
+                                    value={tempSettings.logoBorderColor || '#0266ff'}
+                                    onChange={(e) => handleSettingsFieldChange('logoBorderColor', e.target.value)}
+                                    className="form-control-color border-0 rounded"
+                                    style={{ width: '100%', height: '38px', padding: '0', cursor: 'pointer' }}
+                                  />
+                                </div>
+                              </Form.Group>
+                            </Col>
+                          </Row>
+
+                          {/* Live Preview with Long Press hint */}
+                          {tempSettings.logoImage && (
+                            <div className="mt-3 p-3 bg-light-block rounded-4 text-center border position-relative">
+                              <div className="d-flex align-items-center justify-content-between mb-2">
+                                <span className="small fw-bold text-theme">معاينة الشعار الحية:</span>
+                                <span className="small text-muted" style={{ fontSize: '11px' }}>
+                                  <i className="bi bi-info-circle me-1 text-primary"></i>
+                                  اضغط ضغطة مطولة لتكبير الصورة
+                                </span>
+                              </div>
+                              <div 
+                                className="d-inline-block cursor-pointer p-2 rounded-3"
+                                onMouseDown={handleLogoTouchStart}
+                                onMouseUp={handleLogoTouchEnd}
+                                onTouchStart={handleLogoTouchStart}
+                                onTouchEnd={handleLogoTouchEnd}
+                                onClick={() => setShowLogoModal(true)}
+                                title="اضغط ضغطة مطولة لعرض الصورة بالكامل"
+                              >
+                                <img 
+                                  src={tempSettings.logoImage} 
+                                  alt="معاينة الشعار" 
+                                  style={{
+                                    height: `${tempSettings.logoSize}px`,
+                                    width: (tempSettings.logoShape || 'circle') === 'circle' ? `${tempSettings.logoSize}px` : 'auto',
+                                    borderRadius: (tempSettings.logoShape || 'circle') === 'circle' ? '50%' : tempSettings.logoShape === 'rounded' ? '12px' : '0px',
+                                    border: (tempSettings.logoBorderWidth || 0) > 0 ? `${tempSettings.logoBorderWidth}px solid ${tempSettings.logoBorderColor || '#0266ff'}` : 'none',
+                                    objectFit: 'cover',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                  }} 
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
 
-                      <Form.Group className="mb-3">
+                      <Form.Group className="mb-3 mt-3">
                         <Form.Label className="form-label-custom">حجم الشعار: {tempSettings.logoSize} بكسل (ارتفاع)</Form.Label>
                         <div className="d-flex align-items-center gap-3">
                           <Form.Range
-                            min={20}
-                            max={100}
+                            min={25}
+                            max={120}
                             value={tempSettings.logoSize}
                             onChange={(e) => handleSettingsFieldChange('logoSize', parseInt(e.target.value))}
                             className="w-100"
                           />
-                          <Badge bg="secondary" className="p-2">{tempSettings.logoSize}px</Badge>
+                          <Badge bg="primary" className="p-2 fs-7">{tempSettings.logoSize}px</Badge>
                         </div>
                       </Form.Group>
                     </Card>
@@ -526,14 +771,22 @@ function App() {
                       </Form.Group>
 
                       <Form.Group className="mb-3" controlId="coverageAreas">
-                        <Form.Label className="form-label-custom">مناطق تغطية الخدمة (المناطق التي تعمل بها)</Form.Label>
+                        <Form.Label className="form-label-custom fw-bold d-flex align-items-center justify-content-between">
+                          <span>
+                            <i className="bi bi-map-fill me-1 text-primary"></i> خريطة ومناطق تغطية الخدمة
+                          </span>
+                          <Badge bg="primary" className="fw-normal fs-7">خريطة تفاعلية أونلاين</Badge>
+                        </Form.Label>
                         <Form.Control
                           type="text"
                           value={tempSettings.coverageAreas || ''}
                           onChange={(e) => handleSettingsFieldChange('coverageAreas', e.target.value)}
-                          placeholder="مثال: الرياض، وجدة، وكافة الأحياء المجاورة"
-                          className="form-control-custom text-start"
+                          placeholder="مثال: الرياض - العليا - السلمانية - حي الصحافة - الياسمين - النرجس"
+                          className="form-control-custom text-start mb-3"
                         />
+                        <div className="border rounded-4 overflow-hidden shadow-sm">
+                          <ServiceMap phoneWhatsapp={tempSettings.phoneWhatsapp} />
+                        </div>
                       </Form.Group>
                     </Card>
                   </Col>
@@ -637,14 +890,14 @@ function App() {
                 <Col lg={6} className="text-center text-lg-start d-flex flex-column align-items-center align-items-lg-start">
                   <div className="hero-badge">
                     <i className="bi bi-patch-check-fill"></i>
-                    <span>فني معتمد وخبرة تزيد عن 5 سنوات</span>
+                    <span>فني تكييف معتمد بالرياض - خدمة 24 ساعة</span>
                   </div>
                   <h1 className="fw-extrabold display-4 mb-3 lh-sm text-theme text-center text-lg-start">
-                    نصنع الجو المثالي <br />
-                    لراحتك في <span className="text-gradient-cool">الصيف</span> و <span className="text-gradient-warm">الشتاء</span>
+                    فني تكييف بالرياض <br />
+                    صيانة وتصليح مكيفات <span className="text-gradient-cool">سبليت</span> و <span className="text-gradient-warm">مركزي</span>
                   </h1>
                   <p className="lead text-muted mb-4 text-center text-lg-start" style={{ maxWidth: '520px' }}>
-                    صيانة، تركيب، غسيل، وتجهيز كافة أنواع المكيفات وأنظمة التبريد المنزلية والتجارية بأعلى جودة وضمان حقيقي مع سرعة استجابة فائقة.
+                    أفضل فني صيانة، غسيل، تركيب، وشحن فريون المكيفات بالرياض. نغطي كافة أحياء الرياض (العليا - السلمانية - الصحافة - الياسمين - النرجس) بأعلى جودة وضمان معتمد.
                   </p>
                   
                   <div className="d-flex flex-column flex-sm-row gap-3 w-100 justify-content-center justify-content-lg-start">
@@ -795,17 +1048,7 @@ function App() {
               </Row>
 
               {/* Working Coverage Areas Block */}
-              {settings.coverageAreas && (
-                <div className="mt-5 p-4 rounded-4 bg-light-block border border-light-custom text-center animate-glow-glow">
-                  <h5 className="fw-bold text-theme mb-3">
-                    <i className="bi bi-geo-alt-fill text-primary-blue me-2 animate-bounce"></i>
-                    مناطق الخدمة وتغطية العمل
-                  </h5>
-                  <p className="lead text-muted mb-0 fs-6">
-                    نقدم خدماتنا الاحترافية في صيانة وتركيب التكييف في كافة أحياء ومناطق: <strong className="text-primary-blue">{settings.coverageAreas}</strong>
-                  </p>
-                </div>
-              )}
+              <ServiceMap phoneWhatsapp={settings.phoneWhatsapp} coverageAreasText={settings.coverageAreas} />
             </Container>
           </section>
 
@@ -887,6 +1130,65 @@ function App() {
             </Container>
           </section>
 
+          {/* FAQ Accordion Section for Google SEO & Rich Snippets */}
+          <section id="faq" className="py-5 bg-white-section border-top border-light-custom">
+            <Container className="py-4">
+              <div className="text-center mb-5">
+                <Badge bg="primary" className="p-2 mb-2 fs-7 rounded-pill">أسئلة شائعة وإجاباتها</Badge>
+                <h2 className="section-title text-theme">الأسئلة الشائعة حول خدمات فني تكييف بالرياض</h2>
+                <p className="section-subtitle">
+                  كل ما تود معرفته عن خدمات صيانة وشحن وتنظيف المكيفات بالرياض وأسعار وتغطية الخدمات.
+                </p>
+              </div>
+              
+              <Row className="justify-content-center">
+                <Col lg={10}>
+                  <div className="faq-accordion-wrapper">
+                    <Card className="faq-item-card border-0 shadow-sm rounded-4 mb-3 p-4 text-right">
+                      <h5 className="faq-question fw-bold mb-2">
+                        <i className="bi bi-question-circle-fill text-primary me-2"></i>
+                        كيف تضمن لي الخدمة كأفضل فني تكييف بالرياض؟
+                      </h5>
+                      <p className="faq-answer text-muted mb-0 small">
+                        نحن نوفر فنيين متخصصين ومجازين مع خبرة تزيد عن 5 سنوات في الرياض، ونقدم ضماناً كتابياً على جميع قطع الغيار المستبدلة وأعمال صيانة المكيفات السبليت والمركزي مع فحص كامل للتكييف قبل مغادرة الموقع.
+                      </p>
+                    </Card>
+
+                    <Card className="faq-item-card border-0 shadow-sm rounded-4 mb-3 p-4 text-right">
+                      <h5 className="faq-question fw-bold mb-2">
+                        <i className="bi bi-geo-alt-fill text-danger me-2"></i>
+                        ما هي الأحياء والمناطق التي يغطيها فني تكييف بالرياض؟
+                      </h5>
+                      <p className="faq-answer text-muted mb-0 small">
+                        نغطي جميع أحياء مدينة الرياض وشمال وشرق الرياض، مع تواجد سريع في أحياء (العليا، السلمانية، حي الصحافة، الياسمين، النرجس) وسرعة استجابة في غضون دقائق من طلب الخدمة.
+                      </p>
+                    </Card>
+
+                    <Card className="faq-item-card border-0 shadow-sm rounded-4 mb-3 p-4 text-right">
+                      <h5 className="faq-question fw-bold mb-2">
+                        <i className="bi bi-clock-fill text-success me-2"></i>
+                        هل تتوفر خدمة صيانة مكيفات طارئة 24 ساعة بالرياض؟
+                      </h5>
+                      <p className="faq-answer text-muted mb-0 small">
+                        نعم، نعمل على مدار 24 ساعة يومياً طوال أيام الأسبوع في الرياض لاستقبال بلاغات الطوارئ وأعطال توقف التبريد المفاجئ للمكيفات في الصيف والشتاء.
+                      </p>
+                    </Card>
+
+                    <Card className="faq-item-card border-0 shadow-sm rounded-4 mb-3 p-4 text-right">
+                      <h5 className="faq-question fw-bold mb-2">
+                        <i className="bi bi-snow text-info me-2"></i>
+                        ما هي أنواع فريون المكيفات المستخدمة وما سعر التعبئة؟
+                      </h5>
+                      <p className="faq-answer text-muted mb-0 small">
+                        نستخدم فريون أصلي عالي الجودة (R410A / R22) مخصص للمكيفات الحديثة بالرياض، ويتم فحص التسريب بالكامل واختبار الضغط قبل التعبئة لضمان استمرار التبريد بأفضل كفاءة وتوفير الكهرباء.
+                      </p>
+                    </Card>
+                  </div>
+                </Col>
+              </Row>
+            </Container>
+          </section>
+
           {/* Contact Section (Replaces old Booking Form Section) */}
           <section id="contact" className="py-5 bg-light-section text-center border-top border-light-custom">
             <Container className="py-4">
@@ -936,13 +1238,17 @@ function App() {
                   <Card className="custom-card text-center p-4">
                     <Card.Body className="d-flex flex-column align-items-center">
                       <div className="icon-box icon-cool mb-3">
-                        <i className="bi bi-geo-alt-fill"></i>
+                        <i className="bi bi-map-fill"></i>
                       </div>
                       <h5 className="fw-bold text-theme mb-2">مناطق تغطية خدماتنا</h5>
-                      <p className="text-muted small mb-3">نغطي كافة أرجاء وأحياء المدن والضواحي المجاورة</p>
-                      <span className="fw-bold text-theme fs-6">
+                      <p className="text-muted small mb-3">خريطة تفاعلية حية تحدد مواقع الفنيين والتغطية المباشرة</p>
+                      <span className="fw-bold text-theme fs-6 mb-3">
                         {settings.coverageAreas}
                       </span>
+                      <a href="#service-map-section" className="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1">
+                        <i className="bi bi-geo-alt-fill"></i>
+                        <span>عرض الخريطة التفاعلية</span>
+                      </a>
                     </Card.Body>
                   </Card>
                 </Col>
@@ -969,10 +1275,11 @@ function App() {
                 <Col xs={6} md={3} lg={2} className="offset-md-1 offset-lg-2 text-right">
                   <h6 className="text-white fw-bold mb-3">روابط سريعة</h6>
                   <ul className="list-unstyled">
-                    <li><a href="#home" onClick={() => setViewMode('site')} className="footer-link">الرئيسية</a></li>
-                    <li><a href="#services" onClick={() => { setViewMode('site'); setTimeout(() => window.location.hash = "#services", 100); }} className="footer-link">خدماتنا</a></li>
-                    <li><a href="#why-us" onClick={() => { setViewMode('site'); setTimeout(() => window.location.hash = "#why-us", 100); }} className="footer-link">لماذا نحن؟</a></li>
-                    <li><a href="#contact" onClick={() => { setViewMode('site'); setTimeout(() => window.location.hash = "#contact", 100); }} className="footer-link">تواصل معنا</a></li>
+                    <li><a href="#home" onClick={(e) => { e.preventDefault(); handleNavClick('home'); }} className="footer-link">الرئيسية</a></li>
+                    <li><a href="#services" onClick={(e) => { e.preventDefault(); handleNavClick('services'); }} className="footer-link">خدماتنا</a></li>
+                    <li><a href="#service-map-section" onClick={(e) => { e.preventDefault(); handleNavClick('service-map-section'); }} className="footer-link">مناطق الخدمة والتغطية</a></li>
+                    <li><a href="#why-us" onClick={(e) => { e.preventDefault(); handleNavClick('why-us'); }} className="footer-link">لماذا نحن؟</a></li>
+                    <li><a href="#contact" onClick={(e) => { e.preventDefault(); handleNavClick('contact'); }} className="footer-link">تواصل معنا</a></li>
                   </ul>
                 </Col>
 
@@ -1067,6 +1374,38 @@ function App() {
               </Button>
             </div>
           </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Fullscreen Logo Image Lightbox Modal (Long-Press / Double-Click) */}
+      <Modal 
+        show={showLogoModal} 
+        onHide={() => setShowLogoModal(false)} 
+        centered 
+        size="lg"
+        className="modal-theme"
+        dir="rtl"
+      >
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold fs-5 text-dark text-theme">
+            <i className="bi bi-arrows-fullscreen text-primary me-2"></i> عرض صورة الشعار الكاملة
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center p-3">
+          {settings.logoImage || tempSettings.logoImage ? (
+            <div className="d-flex flex-column align-items-center">
+              <div className="p-2 rounded-4 bg-light-block border shadow-sm w-100" style={{ maxHeight: '75vh', overflow: 'auto' }}>
+                <img 
+                  src={settings.logoImage || tempSettings.logoImage} 
+                  alt="الشعار الكامل" 
+                  className="img-fluid rounded-3 shadow-sm"
+                  style={{ maxHeight: '70vh', objectFit: 'contain' }}
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted mb-0">لا توجد صورة شعار مرفوعة حالياً</p>
+          )}
         </Modal.Body>
       </Modal>
     </>
